@@ -1,8 +1,35 @@
+const color = {2:`rgb(199,249,191)`,4:`rgb(152,241,139)`,8:`rgb(99,228,163)`,16:`rgb(74,227,176)`,32:`rgb(112,209,219)`,64:`rgb(112,156,219)`,128:`rgb(122,112,219)`,256:`rgb(175,112,219)`,512:`rgb(219,112,209)`,1024:`rgb(219,112,155)`,2048:`rgb(208,70,125)`}
+
 let gameObjectsArray=[]
+let action = false
+
+const getRandomInt = (min, max) => {
+    min = Math.ceil(min)
+    max = Math.floor(max)
+    return Math.floor(Math.random() * (max - min)) + min
+}
+
+const randomChoice = (array,quantity=1) => { // Tratar erros Array deve ser sempre um Vetor com pelo menos 1 elemento
+    let newArray = []
+    if(array.length == 1){
+        return array
+    }else{
+        quantity = quantity > array.length ? quantity = array.length : quantity
+        for (const _ of Array(quantity).keys()) {
+            const picked = array[Math.floor(Math.random()*array.length)]
+            newArray.push(picked)
+            const pickIndex = array.indexOf(picked)
+            const removedItem = array.splice(pickIndex, 1)
+        }
+        return newArray
+    }
+}
 
 function start(){
     gameObjectsArray=[]
     buildGameObjects()
+    box_generator(3)
+    updateHTML()
     game()
 }
 
@@ -15,6 +42,11 @@ function catchEvent(event){
     if(keyPressed === 87 || 65 || 83 || 68 ){
         calculate_game_table(keyPressed)
         updateHTML()
+        if(action){
+            action=false
+            box_generator()
+            updateHTML()
+        }
     }
 }
 
@@ -22,14 +54,9 @@ function buildGameObjects(){
     const boxes = document.getElementsByClassName("box")
     let cont=0
     function gameObjectFactory(cont,i,j){
-        let test = 0
-        if(i===3 && j===0 || i==0 && j===1 || i==1 && j===3 || i==3 && j===3) //
-            test=2;//
-        else if (i==3 && j===2)
-            test=4
         return {
             box: boxes[cont],
-            innerValue: test,
+            innerValue: 0,
             coordX: i,
             coordY: j
         }
@@ -49,10 +76,12 @@ function updateHTML(){
         if(gameObjectsArray[i].innerValue){
             gameObjectsArray[i].box.innerHTML = gameObjectsArray[i].innerValue
             gameObjectsArray[i].box.classList.add("filled")
+            gameObjectsArray[i].box.style.backgroundColor = color[gameObjectsArray[i].innerValue]
         }
         else{
-            gameObjectsArray[i].box.innerHTML = 0
+            gameObjectsArray[i].box.innerHTML = ""
             gameObjectsArray[i].box.classList.remove("filled")
+            gameObjectsArray[i].box.style.backgroundColor = `rgb(255,255,255)`
         }
     }
 }
@@ -70,16 +99,24 @@ function calculate_game_table(orientation){
         calculate_boxes_movement()
     }
     function calculate_boxes_movement(){
+        //let deepBreak = true
         for (const variableBoardVal of Array(4).keys()) {
             if (orientation === "ToDown" || orientation === "ToRight"){
                 const reverseBoxList = boxList[variableBoardVal].slice().reverse()
                 reverseBoxList.forEach(box => {
                     const boxDirectionRef = (orientation === "ToDown"  ? box.coordY+1 : box.coordX+1)
                     if (box.innerValue){
+                        deepBreak = true
+                        console.log(box.box,deepBreak)
                         for (let i=boxDirectionRef; i<=3; i++){
-                            orientation === "ToDown"  ? 
-                            update_box_status(box,box.coordX,i,variableBoardVal,staticBoardVal) : 
-                            update_box_status(box,i,box.coordY,staticBoardVal,variableBoardVal)
+                            if(deepBreak){
+                                orientation === "ToDown"  ? 
+                                update_box_status(box,box.coordX,i,variableBoardVal,staticBoardVal) : 
+                                update_box_status(box,i,box.coordY,staticBoardVal,variableBoardVal)
+                            }
+                            else{
+                                break
+                            }
                         }
                     }   
                 })
@@ -88,10 +125,17 @@ function calculate_game_table(orientation){
                 regularBoxList.forEach(box => {
                     const boxDirectionRef = (orientation === "ToUp" ? box.coordY-1 : box.coordX-1)
                     if (box.innerValue){
+                        deepBreak = true
+                        console.log(box.box,deepBreak)
                         for (let i=boxDirectionRef; i>=0; i--){
-                            orientation === "ToUp"   ? 
-                            update_box_status(box,box.coordX,i,variableBoardVal,staticBoardVal) : 
-                            update_box_status(box,i,box.coordY,staticBoardVal,variableBoardVal)
+                            if(deepBreak){
+                                orientation === "ToUp"   ? 
+                                update_box_status(box,box.coordX,i,variableBoardVal,staticBoardVal) : 
+                                update_box_status(box,i,box.coordY,staticBoardVal,variableBoardVal)
+                            }
+                            else{
+                                break
+                            }
                         }
                     }   
                 })
@@ -99,13 +143,18 @@ function calculate_game_table(orientation){
         }
     }
     function update_box_status(box,xTarget,yTarget,xBoard,yBoard){
+        //console.log(box.box,deepBreak)
         for (const cell of gameObjectsArray) {
-            if(cell.coordX == xTarget && cell.coordY == yTarget){
+            if((cell.coordX == xTarget && cell.coordY == yTarget) && deepBreak){
+                //console.log(box.box,cell.box)
+                //console.log(cell.box)
                 if(cell.innerValue){
                     if(cell.innerValue === box.innerValue){
-                        //console.log(box.box,"Merge com",cell.box) Manter, Debugger via Console
+                        //console.log(box.box,"Merge com",cell.box) // Manter, Debugger via Console
                         cell.innerValue += box.innerValue
                         box.innerValue = 0
+                        deepBreak = false
+                        action = true
                         break
                     }else{
                         let previX,previY
@@ -127,25 +176,30 @@ function calculate_game_table(orientation){
                         }
                         for (const previCell of gameObjectsArray) {
                             if(previCell.coordX == previX && previCell.coordY == previY){
-                                if(previCell.box === box.box || box.innerValue === 0){
-                                    //console.log(box.box,"Ja esta no local em que devia",previCell.box) Manter, Debugger via Console
-                                    break
-                                }else{
-                                    //console.log(box,"Vai para",previCell) Manter, Debugger via Console
+                                if(!(previCell.box === box.box || box.innerValue === 0)){
+                                    //console.log(box.box,"Vai para",previCell.box) // Manter, Debugger via Console
                                     previCell.innerValue = box.innerValue
                                     box.innerValue = 0
-                                    break
+                                    action = true
                                 }
+                                // else{
+                                //     console.log(box.box,"Ja esta no local em que devia",previCell.box) // Manter, Debugger via Console
+                                // }
+                                deepBreak = false
+                                break
                             }
-                        }
+                        } 
                     }
                 }else if(cell.coordX == xBoard && cell.coordY == yBoard){
-                    // console.log(box.box,"Vai para borda",cell.box) Manter, Debugger via Console
+                    //console.log(box.box,"Vai para borda",cell.box) // Manter, Debugger via Console
                     cell.innerValue = box.innerValue
                     box.innerValue = 0
+                    deepBreak = false
+                    action = true
                     break
                 }
             }
+            
         }
     }
     const boxList = []
@@ -163,31 +217,18 @@ function calculate_game_table(orientation){
     filter_columns_rows()
 }
 
-function box_generator(){
-    
+function box_generator(quantity=1){
+    const newBoxesPositions = () => {
+        let validCells = gameObjectsArray.filter(item => (!item.innerValue))
+        return randomChoice(validCells,quantity)
+    }
+    newBoxesPositions().forEach(element => {
+        //console.log(element.box)
+        element.innerValue = randomChoice([2,2,2,2,4])[0]
+    })
 }
 start()
+
 // ================ Prototipo   =========================
-let validCells = []
-const getRandomInt = (min, max) => {
-    min = Math.ceil(min)
-    max = Math.floor(max)
-    return Math.floor(Math.random() * (max - min)) + min
-}
 
-validCells = gameObjectsArray.filter(item => (!item.innerValue))
-
-console.log(validCells)
-// Tratar para que validCells seja uma lista com .length sempre maior que 1
-for (const column of Array(3).keys()) {
-    let cell = validCells[Math.floor(Math.random()*validCells.length)]
-    console.log(cell.box)
-    let cellPostion = validCells.indexOf(cell)
-    let removedItem = validCells.splice(cellPostion, 1)
-}
 // ================ Prototipo   ========================= 
-
-
-// for(let i=0;i<16;i++){ // Debugger
-//     console.log(gameObjectsArray[i].innerValue,gameObjectsArray[i].box,gameObjectsArray[i].coordX,gameObjectsArray[i].coordY)
-// }
